@@ -36,6 +36,60 @@ Notes
 - Commit containing this entry: find via Git history; do not invent a hash.
 ```
 
+## 2026-09-20 17:45:30 IST (UTC +0530)
+
+Agent / Environment
+- Agent application and version: Codex desktop; version unknown.
+- Model: GPT-6; exact model revision unknown.
+- Computer / OS: comet / Linux.
+- Branch and starting commit: main, 621748df723d92a42dea79b26457b7e13ec2ce93.
+
+Prompt / Request
+- Original user prompt: "get yourself familiar with how the plan run script run in GMRTCAL, create a script \"pipeline-plan-run\" that does similar, for this there will be a setup json file as for plan run but this will take a list of paths from where to take the individual intents (python scripts or c++ scripts)
+also make a git repo for this and push to git the first version"
+- Follow-up: "give a sample  plan file that can be created in the first run, GMRTCAL intents dont need to be included in the pipeline, but the pipeline can use any cli based code as an intent and the cli inputs as inputs under intent"
+- Polished summary: Implement the first standalone generic CLI intent runner, informed by GMRTCAL plan syntax, with setup search paths, runnable first-run examples, and a first-version Git checkpoint/push.
+
+Objective
+- Run arbitrary CLI programs in ordered intent blocks, including Python scripts,
+  C++ source files and compiled executables, without GMRTCAL science dependencies.
+
+Changes Made
+- Read GMRTCAL's runner, setup JSON and sample plans as references; no GMRTCAL files modified.
+- Added script/pipeline-plan-run: configuration validation, path search, CLI argument
+  translation, variables/defaults, numbered cairns, selection, fixed loops and
+  repetitions, previews, Python/native/C++ execution, failure handling, unique reports.
+- Added script/install with interpreter-specific launcher, idempotent installation,
+  collision refusal and uninstall. Installed ~/.local/bin/pipeline-plan-run.
+- Added pipeline/sample.plan, pipeline/examples/echo-message.py and setup/parameter
+  JSON templates. First no-argument run or --init creates the runnable sample workspace.
+- Added tests/test_pipeline_runner.py; updated README.md, AGENTS.md,
+  version/CHANGELOG.txt and docs/decisions.txt. Version remains first release 0.1.0.
+- Preserved existing local Git repository and scaffold history.
+
+Verification
+- python3 -m unittest discover -s tests -v: 17 tests passed (3 context tests and
+  14 runner integration tests), including actual C++ success/failure, venv
+  interpreter preservation, installed execution outside checkout with spaces,
+  previews without output creation, configuration replacement/overrides,
+  selection/repetition, failure reports, and no shell expansion.
+- git diff --check: passed before checkpoint review.
+- ~/.local/bin/pipeline-plan-run installed successfully.
+- GitHub CLI authenticated as prasundutta151; no project remote exists.
+  Proposed prasundutta151/astro-pipeline repository was not found by read-only lookup.
+
+Notes
+- Implementation complete. Push pending the user's destination/visibility choice.
+- Git has no explicit user.name, but git var GIT_AUTHOR_IDENT resolves the existing
+  astrolab_PD author with configured email, matching the initial scaffold commit.
+  Use that existing Git identity without inventing or changing configuration.
+- Only single-translation-unit C++ compilation is built in; externally built
+  programs can be used directly. Generic CLI option/science validation belongs
+  to each intent. No GMRTCAL-specific convergence or science behavior is assumed.
+- Full manuals pending explicit project-document request: runner reference, plan
+  syntax, setup/parameters, initialization, C++ builds and report format.
+- Commit containing this entry: find via Git history.
+
 ## 2026-09-20T17:26:58.333691+05:30
 
 Agent / Environment

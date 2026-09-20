@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""Run generic CLI intents from GMRTCAL-style plan blocks (standard library only)."""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parent.parent
+VERSION = (ROOT / "version/VERSION").read_text().strip()
+VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+CPP = {".cpp", ".cc", ".cxx", ".C"}
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def positive(value, label):
+    require(type(value) is int and value > 0, f"{label} must be a positive integer")
+    return value
+
+
+def pairs(items):
+    result = {}
+    for key, value in items:
+        require(key not in result, f"Duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def read_json(path, allowed):
+    value = json.loads(path.read_text(), object_pairs_hook=pairs,
+                       parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f"Invalid JSON number: {x}")))
+    require(isinstance(value, dict), f"{path}: expected a JSON object")
+    require(type(value.get("schema_version")) is int and value["schema_version"] == 1,
+            f"{path}: schema_version must be 1")
+    require(not value.keys() - allowed, f"{path}: unknown keys: {sorted(value.keys() - allowed)}")
+    return value
+
+
+def path_value(value, base):
+    require(isinstance(value, str) and bool(value), "Paths must be nonempty strings")
+    path = Path(value).expanduser()
+    # Preserve executable symlinks: resolving a venv's python to its base binary
+    # would silently discard that environment's installed dependencies.
+    return Path(os.path.abspath(base / path if not path.is_absolute() else path))
+
+
+def executable(value, base):
+    require(isinstance(value, str) and bool(value), "Executable must be a nonempty string")
+    path = str(path_value(value, base)) if "/" in value or value.startswith("~") else shutil.which(value)
+    require(path and Path(path).is_file() and os.access(path, os.X_OK), f"Executable not found: {value}")
+    return os.path.abspath(path)
+
+
+def scalar(text):
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        if text.startswith("'") and text.endswith("'"):
+            return text[1:-1]
+        return text
+
+
+def uncomment(line):
+    quote = None
+    escape = False
+    result = []
+    for char in line:
+        if escape:
+            escape = False
+        elif char == "\\":
+            escape = True
+        elif char == quote:
+            quote = None
+        elif char in "\"'" and quote is None:
+            quote = char
+        elif char == "#" and quote is None:
+            break
+        result.append(char)
+    return "".join(result).strip()
+
+
+def expand(value, variables, trail=()):
+    if isinstance(value, list):
+        return [expand(item, variables, trail) for item in value]
+    if isinstance(value, dict):
+        return {key: expand(item, variables, trail) for key, item in value.items()}
+    if not isinstance(value, str):
+        return value
+
+    def lookup(name):
+        require(name in variables, f"Unknown variable: ${{{name}}}")
+        require(name not in trail, f"Recursive variable: {name}")
+        return expand(variables[name], variables, (*trail, name))
+
+    match = VARIABLE.fullmatch(value)
+    if match:
+        return lookup(match[1])
+    return VARIABLE.sub(lambda m: str(lookup(m[1])), value)
+
+
+def parse_plan(path, variables, defaults):
+    """Parse explicit blocks; reject unknown syntax instead of skipping it."""
+    steps = []
+    current = None
+    section = None
+    cairn = None
+    loop = None
+    counter = 0
+    variables = dict(variables)
+    defaults = dict(defaults)
+    for lineno, raw in enumerate(path.read_text().splitlines(), 1):
+        line = uncomment(raw)
+        if not line:
+            continue
+        where = f"{path}:{lineno}"
+        if line.lower() in {"end", "end:", "end card", "---"}:
+            require(section is not None, f"{where}: unexpected end")
+            if current is not None:
+                counter += 1
+                entry = dict(current)
+                entry["cairn"] = cairn if cairn is not None else counter
+                steps.append(entry)
+                current = None
+                cairn = None
+            section = None
+            continue
+        match = re.match(r"^([^:=]+)\s*[:=]\s*(.*)$", line)
+        require(match is not None, f"{where}: expected key: value or end")
+        key, text = match[1].strip(), match[2].strip()
+        value = scalar(text)
+        card = key.lower()
+        if section is None:
+            if card in {"variables", "vars", "defaults"}:
+                require(not text, f"{where}: block header must have no value")
+                section = "variables" if card in {"variables", "vars"} else "defaults"
+            elif card in {"cairn", "step"}:
+                cairn = positive(value, f"{where}: cairn")
+            elif card == "loop":
+                if value == "end":
+                    require(loop is not None, f"{where}: no open loop")
+                    start, count = loop
+                    require(len(steps) > start, f"{where}: empty loop")
+                    steps.extend(steps[start:] * (count - 1))
+                    loop = None
+                else:
+                    require(loop is None, f"{where}: nested loops are unsupported")
+                    loop = (len(steps), positive(value, f"{where}: loop"))
+            elif card == "intent":
+                require(isinstance(value, str) and bool(value), f"{where}: intent must be a command name/path")
+                current = {"intent": value, "inputs": dict(defaults), "variables": dict(variables)}
+                section = "intent"
+            else:
+                raise ValueError(f"{where}: unknown card {key!r}; use an intent/variables/defaults block")
+        elif section == "variables":
+            require(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key), f"{where}: invalid variable name")
+            variables[key] = value
+        elif section == "defaults":
+            defaults[key] = value
+        else:
+            require(card != "intent", f"{where}: close the previous intent with end")
+            current["inputs"][key] = value
+    require(section is None, f"{path}: missing end card")
+    require(loop is None, f"{path}: missing loop: end")
+    require(cairn is None, f"{path}: cairn has no intent")
+    require(steps, f"{path}: no intents found")
+    return steps
+
+
+def resolve_intent(name, config):
+    require(isinstance(name, str) and bool(name), "Intent must be a nonempty string")
+    if "/" in name or name.startswith("~"):
+        candidates = [path_value(name, Path(config["plan_file"]).parent)]
+    else:
+        candidates = []
+        for entry in config["intent_paths"]:
+            path = Path(entry)
+            if path.is_file():
+                if name in {path.name, path.stem}:
+                    candidates.append(path)
+            else:
+                exact = path / name
+                matches = [exact] if exact.is_file() else [path / (name + ext) for ext in (".py", ".cpp", ".cc", ".cxx", ".C") if (path / (name + ext)).is_file()]
+                require(len(matches) <= 1, f"Ambiguous intent {name} in {path}; specify the extension")
+                candidates.extend(matches)
+            if candidates:
+                break
+        if not candidates and config["allow_path"]:
+            found = shutil.which(name)
+            if found:
+                candidates = [Path(found)]
+    require(candidates and candidates[0].is_file(), f"Intent not found: {name}; check intent_paths or PATH")
+    path = Path(os.path.abspath(candidates[0]))
+    require(path.suffix in CPP | {".py"} or os.access(path, os.X_OK), f"Intent is not executable: {path}")
+    return path
+
+
+def cli_arguments(inputs):
+    inputs = dict(inputs)
+    args = inputs.pop("args", [])
+    options = inputs.pop("options", {})
+    require(isinstance(args, list) and all(isinstance(x, str) for x in args), "args must be a JSON array of strings")
+    require(isinstance(options, dict), "options must be a JSON object")
+    inputs.update(options)
+    result = []
+    for key, value in inputs.items():
+        require(re.fullmatch(r"-{0,2}[A-Za-z0-9][A-Za-z0-9_-]*", key), f"Invalid CLI option: {key}")
+        flag = key if key.startswith("-") else "--" + key.replace("_", "-")
+        if value is True:
+            result.append(flag)
+        elif value is not None:
+            require(isinstance(value, (str, int, float, bool, list)), f"{key}: use args for structured CLI values")
+            values = value if isinstance(value, list) else [value]
+            require(all(isinstance(x, (str, int, float, bool)) for x in values), f"{key}: invalid list values")
+            # Explicit false is preserved, not silently dropped. args handles --no-X dialects.
+            if value is False:
+                result.append(flag + "=false")
+            else:
+                result.append(flag)
+                result.extend(str(x).lower() if isinstance(x, bool) else str(x) for x in values)
+    return result + args
+
+
+def selected(number, selectors):
+    if not selectors:
+        return True
+    matches = False
+    for item in selectors:
+        for token in item.split(","):
+            token = token.strip().strip("[]")
+            if token.isdigit():
+                require(int(token) > 0, f"Invalid cairn number: {token}")
+                if number == int(token):
+                    matches = True
+            else:
+                match = re.fullmatch(r"(\d*)[-~:](\d*)", token)
+                require(match and any(match.groups()), f"Invalid cairn selector: {token}")
+                low, high = int(match[1] or 1), int(match[2] or sys.maxsize)
+                require(0 < low <= high, f"Invalid cairn range: {token}")
+                if low <= number <= high:
+                    matches = True
+    return matches
+
+
+def configuration(args):
+    cwd = Path.cwd()
+    setup = path_value(args.setup_file, cwd) if args.setup_file else None
+    base = setup.parent if setup else cwd
+    allowed = {"schema_version", "input_file", "plan_file", "output_path", "plot_path", "parameter_file", "intent_paths", "workdir", "python_executable", "cxx", "cxx_flags", "allow_path"}
+    raw = read_json(setup, allowed) if setup else {}
+    require(not (raw.get("input_file") and raw.get("plan_file")), "Use input_file or plan_file, not both")
+    config = {"schema_version": 1}
+    plan = args.plan_opt or args.plan
+    require(not (args.plan_opt and args.plan), "Specify the plan only once")
+    config["plan_file"] = str(path_value(plan, cwd) if plan else path_value(raw.get("plan_file") or raw.get("input_file"), base))
+    for key, default in (("workdir", "."), ("output_path", "output"), ("plot_path", "plot/generated")):
+        override = getattr(args, key, None)
+        config[key] = str(path_value(override, cwd) if override is not None else path_value(raw.get(key, default), base))
+    paths = args.intent_path if args.intent_path is not None else raw.get("intent_paths", [])
+    require(isinstance(paths, list), "intent_paths must be a list")
+    config["intent_paths"] = [str(path_value(p, cwd if args.intent_path is not None else base)) for p in paths]
+    for path in config["intent_paths"]:
+        require(Path(path).exists(), f"Intent path does not exist: {path}")
+    config["allow_path"] = args.allow_path if args.allow_path is not None else raw.get("allow_path", True)
+    require(type(config["allow_path"]) is bool, "allow_path must be boolean")
+    config["python_executable"] = executable(args.python_executable or raw.get("python_executable", sys.executable), cwd if args.python_executable else base)
+    config["cxx"] = args.cxx or raw.get("cxx", "c++")
+    require(isinstance(config["cxx"], str) and bool(config["cxx"]), "cxx must be a command name/path")
+    if "/" in config["cxx"]:
+        config["cxx"] = str(path_value(config["cxx"], cwd if args.cxx else base))
+    config["cxx_flags"] = raw.get("cxx_flags", ["-std=c++17", "-O2"])
+    require(isinstance(config["cxx_flags"], list) and all(isinstance(x, str) for x in config["cxx_flags"]), "cxx_flags must be a list of strings")
+    parameter = path_value(args.parameter_file, cwd) if args.parameter_file else (path_value(raw["parameter_file"], base) if raw.get("parameter_file") else None)
+    params = read_json(parameter, {"schema_version", "parameters"}).get("parameters") if parameter else {}
+    require(isinstance(params, dict) and not params.keys() - {"variables", "defaults", "continue_on_error"}, "parameters accepts variables, defaults, continue_on_error only")
+    for key in ("variables", "defaults"):
+        config[key] = params.get(key, {})
+        require(isinstance(config[key], dict), f"parameters.{key} must be an object")
+    config["continue_on_error"] = args.continue_on_error if args.continue_on_error is not None else params.get("continue_on_error", False)
+    require(type(config["continue_on_error"]) is bool, "continue_on_error must be boolean")
+    config["parameter_file"] = str(parameter) if parameter else None
+    config["setup_file"] = str(setup) if setup else None
+    require(Path(config["plan_file"]).is_file(), f"Plan not found: {config['plan_file']}")
+    require(Path(config["workdir"]).is_dir(), f"workdir must be an existing directory: {config['workdir']}")
+    return config
+
+
+def prepare(config, args):
+    variables = {**config["variables"], **{k: config[k] for k in ("workdir", "output_path", "plot_path")}, "plan_dir": str(Path(config["plan_file"]).parent)}
+    steps = parse_plan(Path(config["plan_file"]), variables, config["defaults"])
+    prepared = []
+    for step in steps:
+        inputs = expand(step["inputs"], step["variables"])
+        enabled = inputs.pop("use", True)
+        require(type(enabled) is bool, "use must be boolean")
+        repeat = positive(inputs.pop("iter", 1), "iter")
+        label = inputs.pop("label", step["intent"])
+        require(isinstance(label, str), "label must be a string")
+        if not enabled or not selected(step["cairn"], args.cairn):
+            continue
+        name = expand(step["intent"], step["variables"])
+        if args.only and args.only not in {str(step["cairn"]), name, label}:
+            continue
+        path = resolve_intent(name, config)
+        argv = cli_arguments(inputs)
+        kind = "cpp" if path.suffix in CPP else "python" if path.suffix == ".py" else "executable"
+        if kind == "cpp":
+            config["cxx"] = executable(config["cxx"], Path.cwd())
+        for iteration in range(1, repeat + 1):
+            prepared.append({"cairn": step["cairn"], "label": label, "intent": name, "path": str(path), "kind": kind, "args": argv, "iteration": iteration})
+    require(prepared, "No enabled intents match the selection")
+    return prepared
+
+
+def write_report(path, report):
+    temp = path.with_suffix(".tmp")
+    temp.write_text(json.dumps(report, indent=2) + "\n")
+    temp.replace(path)
+
+
+def execute(config, steps):
+    import tempfile
+    output = Path(config["output_path"])
+    output.mkdir(parents=True, exist_ok=True)
+    run = Path(tempfile.mkdtemp(prefix="run-" + dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-", dir=output))
+    report = {"version": VERSION, "started_utc": dt.datetime.now(dt.timezone.utc).isoformat(), "config": config, "plan_sha256": hashlib.sha256(Path(config["plan_file"]).read_bytes()).hexdigest(), "status": "running", "steps": []}
+    report_path = run / "report.json"
+    write_report(report_path, report)
+    print(f"Run report: {report_path}", flush=True)
+    compiled = {}
+    failed = False
+    try:
+        for step in steps:
+            path = step["path"]
+            result = {**step, "source_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+            report["steps"].append(result)
+            start = time.monotonic()
+            rc = 0
+            if step["kind"] == "cpp" and path not in compiled:
+                binary = run / ("intent-" + str(len(compiled)))
+                command = [config["cxx"], *config["cxx_flags"], path, "-o", str(binary)]
+                result["compile_argv"] = command
+                print("Compile: " + shlex.join(command), flush=True)
+                rc = subprocess.run(command, cwd=config["workdir"], check=False).returncode
+                if rc == 0:
+                    compiled[path] = str(binary)
+            if rc == 0:
+                command = ([config["python_executable"], path] if step["kind"] == "python" else [compiled[path]] if step["kind"] == "cpp" else [path]) + step["args"]
+                result["argv"] = command
+                print(f"[Cairn {step['cairn']}] {shlex.join(command)}", flush=True)
+                rc = subprocess.run(command, cwd=config["workdir"], check=False).returncode
+            result.update(returncode=rc, elapsed_seconds=time.monotonic() - start)
+            failed = failed or rc != 0
+            write_report(report_path, report)
+            if rc and not config["continue_on_error"]:
+                break
+        report["status"] = "failed" if failed else "completed"
+    except KeyboardInterrupt:
+        report["status"] = "interrupted"
+        return 130
+    except OSError as exc:
+        report.update(status="failed", error=str(exc))
+        raise
+    finally:
+        report["finished_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
+        write_report(report_path, report)
+    return 1 if failed else 0
+
+
+def initialize(directory):
+    target = Path(directory).expanduser().resolve()
+    files = {
+        "pipeline.plan": ROOT / "pipeline/sample.plan",
+        "pipeline-setup.json": ROOT / "json/pipeline-setup.example.json",
+        "pipeline-parameters.json": ROOT / "json/pipeline-parameters.example.json",
+        "intents/echo-message.py": ROOT / "pipeline/examples/echo-message.py",
+    }
+    for name in files:
+        require(not (target / name).exists(), f"Refusing to overwrite {target / name}")
+    for name, source in files.items():
+        destination = target / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("x") as handle:
+            handle.write(source.read_text())
+    print(f"Created sample workspace: {target}\nPreview: pipeline-plan-run --setup-file {shlex.quote(str(target / 'pipeline-setup.json'))} --dry-run\nRun:     pipeline-plan-run --setup-file {shlex.quote(str(target / 'pipeline-setup.json'))}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, epilog="No arguments creates a sample workspace in the current directory. Child commands receive argument arrays, never shell evaluation.")
+    parser.add_argument("plan", nargs="?", help="Plan path, relative to the caller")
+    parser.add_argument("--plan", "--pipeline", dest="plan_opt")
+    parser.add_argument("--version", action="version", version=VERSION)
+    parser.add_argument("--setup-file", help="Setup JSON; paths resolve against this file")
+    parser.add_argument("--parameter-file", help="Replace setup-selected parameter JSON")
+    parser.add_argument("--init", nargs="?", const=".", metavar="DIRECTORY", help="Create sample plan/setup/parameters/intent; refuse overwrites")
+    parser.add_argument("--print-config", action="store_true", help="Print resolved configuration and selected steps without executing")
+    parser.add_argument("--dry-run", action="store_true", help="Validate and preview without executing or compiling")
+    parser.add_argument("--list", action="store_true", help="List selected intents without executing")
+    parser.add_argument("--intent-path", action="append", help="Intent file/directory; repeat to replace setup search paths")
+    parser.add_argument("--workdir", help="Existing child working directory")
+    parser.add_argument("--output-path", help="Directory for unique run reports and C++ builds")
+    parser.add_argument("--plot-path", help="Value of the plan's ${plot_path} variable")
+    parser.add_argument("--python-executable", help="Python interpreter for .py intents")
+    parser.add_argument("--cxx", help="Compiler for single C++ translation units (default: c++)")
+    parser.add_argument("--allow-path", action=argparse.BooleanOptionalAction, default=None, help="Allow fallback to commands on PATH (default: yes)")
+    parser.add_argument("--continue-on-error", action=argparse.BooleanOptionalAction, default=None, help="Continue after failures; final exit remains nonzero")
+    parser.add_argument("-c", "--cairn", "--steps", action="append", help="Select N, N-M, -M, N-, or comma-separated ranges; repeatable")
+    parser.add_argument("--only", help="Select an intent, label, or cairn number")
+    args = parser.parse_args()
+    try:
+        if args.init is not None or len(sys.argv) == 1:
+            initialize(args.init or ".")
+            return 0
+        config = configuration(args)
+        steps = prepare(config, args)
+        if args.print_config:
+            print(json.dumps({**config, "steps": steps}, indent=2))
+        elif args.dry_run or args.list:
+            for step in steps:
+                command = ([config["python_executable"], step["path"]] if step["kind"] == "python" else [step["path"]]) + step["args"]
+                print(f"[Cairn {step['cairn']}] {step['label']} ({step['kind']}, iteration {step['iteration']}): {shlex.join(command)}")
+                if step["kind"] == "cpp":
+                    print("  Compile before execution: " + shlex.join([config["cxx"], *config["cxx_flags"], step["path"], "-o", "<unique-run-directory>/intent-N"]))
+        else:
+            return execute(config, steps)
+        return 0
+    except (ValueError, OSError, RecursionError) as exc:
+        print(f"pipeline-plan-run: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

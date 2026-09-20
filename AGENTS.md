@@ -10,13 +10,12 @@ with it when changing the contract. To create a project from this template, read
 docs/CREATE_PROJECT.txt. Local checkpoint commits are authorized by this contract.
 
 ## Project facts
-- Purpose: Astronomy software; pipelineing script
-- Language/framework: TODO.
-- Setup command: TODO.
-- Test command: TODO.
-- Build command: TODO.
-- Until these are specified, inspect the project and ask for missing requirements;
-  do not invent commands or claim tests passed.
+- Purpose: Generic CLI pipeline runner using GMRTCAL-style intent plans.
+- Language/framework: Python 3.9+ standard library; optional C++ compiler for source intents.
+- Setup command: `python3 script/install`.
+- Test command: `python3 -m unittest discover -s tests -v`.
+- Build command: None for the runner; C++ source intents compile at execution time.
+- Scientific algorithms and their requirements belong to individual external intents.
 
 ## One editing session at a time
 1. Read this file. Reading files and reviewing code do not require a lock.

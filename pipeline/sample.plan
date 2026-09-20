@@ -1,0 +1,30 @@
+# Generic CLI pipeline. No GMRTCAL commands or dependencies.
+# Created by pipeline-plan-run --init DIRECTORY (or a first run without arguments).
+variables:
+  greeting: "Hello from astro-pipeline"
+end
+
+# Defaults become options on every intent; use only options they all accept.
+defaults:
+  count: 1
+end
+
+cairn: 1
+intent: echo-message
+  label: "First CLI intent"
+  message: ${greeting}
+  uppercase: true
+end
+
+cairn: 2
+intent: echo-message.py
+  message: "Options below intent become CLI inputs"
+  count: 2
+end
+
+# Add your own script or compiled binary to intent_paths in pipeline-setup.json.
+# intent: my-analysis
+#   input_file: "${plan_dir}/data/observation.fits"
+#   sigma: 3.0
+#   args: ["--", "positional input"]
+# end

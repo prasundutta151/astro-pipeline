@@ -1,1 +1,7 @@
-0.1.0 — Initial project scaffold
+0.1.0 — First generic CLI pipeline runner
+- Add pipeline-plan-run with setup JSON intent search paths, generic CLI inputs,
+  variables/defaults, cairn selection, repetitions, fixed loops and dry-run previews.
+- Execute Python scripts, native CLI programs and single-file C++ source intents.
+- Create runnable sample plans/configuration through --init or the first no-argument run.
+- Add user-local installer, unique execution reports and integration tests.
+- Retain the initial project scaffold and agent coordination tools.
