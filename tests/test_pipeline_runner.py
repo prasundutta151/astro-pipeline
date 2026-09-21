@@ -66,6 +66,21 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(cfg["steps"][0]["args"], ["--count", "1", "--message", "Hello from astro-pipeline", "--uppercase"])
         self.assertFalse((self.work / "output").exists())
 
+    def test_version_history_reports_only_current_release(self):
+        checkout = self.base / "version history checkout"
+        (checkout / "script").mkdir(parents=True)
+        (checkout / "version").mkdir()
+        shutil.copy2(RUNNER, checkout / "script/pipeline-plan-run")
+        (checkout / "version/VERSION").write_text("0.1.1\n0.1.0\n")
+        runner = [sys.executable, str(checkout / "script/pipeline-plan-run")]
+        result = subprocess.run(runner + ["--version"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "0.1.1\n")
+        result = subprocess.run(runner + ["--setup-file", str(self.setup)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(next((self.work / "output").glob("run-*/report.json")).read_text())
+        self.assertEqual(report["version"], "0.1.1")
+
     def test_arbitrary_cli_values_and_no_shell_evaluation(self):
         self.probe()
         self.plan.write_text('''intent: probe

@@ -1,0 +1,83 @@
+Plan syntax
+Version 0.1.1 · Generated 2026-09-21
+Each intent block names a CLI and supplies its inputs.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Minimal intent
+
+intent: echo-message.py
+  message: "Hello world"
+  count: 2
+end
+
+This invokes the resolved Python script with --message "Hello world" --count 2. Indentation is decorative. key: value and key = value are accepted. Comments start at # outside quotes. Values use JSON scalars/arrays/objects where valid; otherwise text is literal. Use lowercase true, false and null to obtain typed values. Both double-quoted and single-quoted strings are supported.
+
+CLI value translation
+
+Input | Generated tokens
+input_file: data.fits | --input-file data.fits
+-x: 2 | -x 2
+--long_option: text | --long_option text (spelling preserved)
+verbose: true | --verbose
+enabled: false | --enabled=false
+unused: null | No tokens
+count: 0 | --count 0
+text: "" | --text followed by an empty argument
+values: [1, 2] | --values 1 2
+values: [] | --values
+args: ["convert", "--", "a b"] | Exact tokens appended after generated options
+options: {"label": "value"} | --label value (escape for reserved names)
+
+Boolean dialects vary by CLI. Use args: ["--no-enabled"] if the child expects a negative flag. Put the full token sequence in args for subcommands that must come before options. Piping, redirection, wildcards, environment expansion and command substitution are not interpreted. Use an explicit shell script if shell behavior is needed. Option names are letters/digits/underscores/hyphens; arguments may contain spaces.
+
+Reserved metadata
+
+Key | Type / default | Behavior
+label | String / intent name | Display and exact --only selection label.
+use | Boolean / true | False skips execution (variables and metadata still parse).
+iter | Positive integer / 1 | Repeat this intent; iteration field counts 1..iter.
+args | Array of strings / [] | Exact tokens appended after generated options.
+options | Object / {} | Explicit CLI values; override same-named inputs and permit reserved names.
+
+Variables and defaults
+
+variables:
+  greeting: "Hello"
+end
+defaults:
+  count: 1
+end
+intent: echo-message
+  message: ${greeting}
+  count: 2
+end
+
+Variable names use letters, digits and underscores, starting with a letter or underscore. A whole-value ${name} preserves the referenced JSON type; interpolation inside longer text produces a string. Missing names and recursive references are errors. Variables/defaults are captured when each intent begins. Defaults must be understood by every affected CLI. The runner does not discover option schemas.
+
+Cairns and fixed loops
+
+loop: 2
+cairn: 4
+intent: echo-message
+  message: "Repeated group"
+  iter: 2
+end
+cairn: 7
+intent: echo-message
+  message: "Second step"
+end
+loop: end
+
+This executes cairn 4 twice, cairn 7 once, and then repeats that group. Nested loops are rejected. Cairn labels remain the same across loop repetitions; report order distinguishes executions. There is no loop-pass field or automatic iteration-dependent option scaling. Without an explicit cairn, the intent ordinal is used, including disabled intents. Large repeat counts expand into an in-memory execution list.
+
+Selection and block boundaries
+
+Use -c for positive cairn numbers/ranges, and --only for an exact label, intent name or number. Together they intersect. Every variables/defaults/intent block requires end (also end:, end card or ---). A fixed loop requires loop: end after its complete intent blocks. Raw shell command lines and GMRTCAL-specific science/stop-criteria cards are unsupported.

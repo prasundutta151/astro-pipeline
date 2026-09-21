@@ -1,3 +1,10 @@
+0.1.1 — 2026-09-21
+- Correct --version and run-report metadata to use the current release only,
+  while retaining older versions in version/VERSION.
+- Add regression coverage for version history in CLI output and run reports.
+- Add matching offline HTML/TXT manuals for setup, CLI options, plan syntax,
+  workflow and run-report products, generated from a shared source.
+
 0.1.0 — First generic CLI pipeline runner
 - Add pipeline-plan-run with setup JSON intent search paths, generic CLI inputs,
   variables/defaults, cairn selection, repetitions, fixed loops and dry-run previews.

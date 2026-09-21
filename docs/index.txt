@@ -1,0 +1,24 @@
+astro-pipeline documentation
+Version 0.1.1 · Generated 2026-09-21
+Generic CLI workflows, from first run to reproducible execution.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Start here
+
+Open Overview for installation and scope, then follow the step-by-step guide. The command reference lists every runner option; Configuration and Plan syntax describe the input files. Run reports documents the generated products. All pages and their plain-text equivalents work offline.
+
+Release 0.1.1
+
+This patch fixes version reporting after a release update: --version and report.json now use only the first line of version/VERSION. Older version lines remain as history. The manuals describe the implemented generic runner; no GMRTCAL installation is required.
+
+Documentation generation
+
+These manuals were generated directly with user authorization for this release because project-document was unavailable. HTML and TXT share script/generate-docs.py as their source. Run python3 script/generate-docs.py only when documentation regeneration is requested. No scientific plots are included because the runner itself produces no scientific arrays or plots.

@@ -5,6 +5,11 @@ a GMRTCAL-style `.plan` file. It has no GMRTCAL, CASA, or astronomy-library
 dependency. Python 3.9+ and its standard library are sufficient; compiling C++
 intents additionally requires a C++ compiler.
 
+Current release: **0.1.1**. The [offline documentation](docs/index.html) includes
+the [step-by-step guide](docs/astro-pipeline-step-by-step.html),
+[command reference](docs/pipeline-plan-run.html), and matching plain-text files.
+For browsing on GitHub, start with [the plain-text overview](docs/README.txt).
+
 ## Install and first run
 
 From this checkout, run `python3 script/install`. The installer records that
@@ -140,4 +145,7 @@ Run `python3 -m unittest discover -s tests -v`. Tests use temporary directories 
 synthetic CLIs, including actual C++ compilation when a compiler is available.
 No separate Python build step is needed. Read `AGENTS.md` and `startup-prompt.txt`
 for agent work; see `docs/GIT_SETUP.txt` and `docs/CONTEXT_WORKFLOW.md` for handoffs.
-User manuals are generated only on an explicit project-document request.
+User manuals are generated only on an explicit documentation request. Version
+0.1.1 manuals were generated directly with user authorization because
+project-document was unavailable. Their shared source is
+`script/generate-docs.py`; regenerate with `python3 script/generate-docs.py`.

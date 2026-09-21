@@ -36,6 +36,51 @@ Notes
 - Commit containing this entry: find via Git history; do not invent a hash.
 ```
 
+## 2026-09-21 08:19:16 IST (UTC +0530)
+
+Agent / Environment
+- Codex desktop, version unknown; GPT-6, exact revision unknown.
+- Computer / OS: comet / Linux.
+- Branch / starting commit: main / 91f5d15a177d3a6717116b8188537ebbc0390004.
+
+Prompt / Request
+- Original: "new version doc and push to git".
+- Clarification: "Generate documentation directly for this release".
+- Follow-up: "continue and complete".
+- Summary: Prepare patch release 0.1.1, generate user manuals, and push to GitHub.
+
+Objective
+- Deliver a versioned, documented runner release through the existing public remote.
+
+Changes Made
+- Updated version/VERSION with the standalone updater to 0.1.1, preserving history.
+- Fixed script/pipeline-plan-run to read the current version from the first line;
+  previously the full history would appear in --version and report.json.
+- Added a CLI/report regression test in tests/test_pipeline_runner.py.
+- Added script/generate-docs.py and seven matching HTML/TXT manual pairs under docs/:
+  index, README, astro-pipeline-step-by-step, pipeline-plan-run,
+  astro-pipeline-configuration, astro-pipeline-plan-syntax, astro-pipeline-product-report.
+- Added docs/style.css for offline responsive manuals. Updated README.md links,
+  version/CHANGELOG.txt, docs/decisions.txt and HANDOFF.md.
+- project-document was unavailable after PATH/home searches. User explicitly
+  authorized direct generation for this release; the standing policy is unchanged.
+
+Verification
+- python3 -m unittest discover -s tests -v: 18 tests passed.
+- Runner --version: exactly 0.1.1; regression verifies report metadata too.
+- Verified all seven HTML/TXT pairs, local links, anchors, embedded JSON, release
+  strings and coverage of all implemented CLI options.
+- Headless Chrome screenshots visually inspected at desktop and narrow (600px)
+  widths; readable headings, navigation, code and options table. Review images
+  remain ignored under output/doc-review/.
+- Generated manuals checked for personal absolute paths; none found.
+- git diff --check passed before release checkpoint.
+
+Notes
+- Versioned source and manuals ready for the authorized main/v0.1.1 push.
+- No scientific plotting products exist, so no scientific plots were fabricated.
+- Commit containing this entry: use Git history.
+
 ## 2026-09-20 21:45:04 IST (UTC +0530)
 
 Agent / Environment

@@ -16,7 +16,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = (ROOT / "version/VERSION").read_text().strip()
+VERSION = (ROOT / "version/VERSION").read_text().splitlines()[0].strip()
 VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 CPP = {".cpp", ".cc", ".cxx", ".C"}
 
