@@ -1,0 +1,139 @@
+pipeline-plan-run
+Version 0.1.1 · Generated 2026-09-21
+Command reference for the generic intent runner.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Purpose
+
+Resolve a text plan against setup search paths, translate intent inputs into CLI arguments and execute selected commands in order.
+
+Usage
+
+pipeline-plan-run [PLAN | --plan PLAN] [--setup-file SETUP.json] [OPTIONS]
+pipeline-plan-run --init [DIRECTORY]
+pipeline-plan-run --help
+
+Options
+
+All options are optional individually; execution needs a plan from the CLI or setup. Runner paths have no physical units. Cairn numbers and repeat counts are positive dimensionless integers. Explicit CLI values override corresponding setup/parameter settings; missing flags retain JSON values.
+
+Option | Type | Default | Meaning / constraints
+plan / --plan / --pipeline | Path | Setup input_file/plan_file | Required for execution unless setup supplies it; choose positional or flag, not both.
+-h / --help | Flag | Off | Print help and exit.
+--version | Flag | Off | Print current version and exit.
+--setup-file | File path | None | Optional schema-version-1 setup JSON.
+--parameter-file | File path | Setup parameter_file | Replace the setup-selected parameter file completely.
+--init [DIRECTORY] | Directory path | Current directory if value omitted | Create sample files and exit; refuse overwrites. No arguments does the same.
+--print-config | Flag | Off | Print resolved configuration and selected steps; do not execute.
+--dry-run / --list | Flags | Off | Preview selected steps without creating outputs or compiling.
+--intent-path | Repeatable path | Setup list, otherwise [] | Files/directories to search. CLI list replaces the entire setup list.
+--workdir | Directory path | Setup value, otherwise . | Existing child working directory.
+--output-path | Directory path | Setup value, otherwise output | Parent of unique run reports and C++ builds; created only during execution.
+--plot-path | Directory path | Setup value, otherwise plot/generated | Plan variable only; directory is not created by runner.
+--python-executable | Executable path/name | Setup value, otherwise runner interpreter | Interpreter for .py intents; preserves virtual environments.
+--cxx | Executable path/name | Setup value, otherwise c++ | Compiler for one translation unit.
+--allow-path / --no-allow-path | Boolean flags | Setup value, otherwise true | Enable/disable PATH fallback for intent names.
+--continue-on-error / --no-continue-on-error | Boolean flags | Parameter value, otherwise false | Continue after child/build failure; overall exit still fails.
+-c / --cairn / --steps | Repeatable selector | All enabled steps | Positive N, N-M, -M, N-; optional brackets and comma lists.
+--only | String | None | Exact label, intent or cairn number; intersects -c selection.
+
+Inputs and outputs
+
+Inputs are a .plan text file, optional setup/parameter JSON and installed or source CLI intents. Actual execution produces report.json and optional C++ binaries under a unique run directory; see Run reports. Child programs produce their own output formats. --print-config emits resolved JSON to stdout only; --list and --dry-run emit text to stdout.
+
+Examples
+
+pipeline-plan-run my.plan --intent-path ./tools --workdir ./work --dry-run
+pipeline-plan-run --setup-file setup.json --parameter-file alternate.json --print-config
+pipeline-plan-run --setup-file setup.json -c '1,3,7-' --continue-on-error
+
+Exit status
+
+Code | Meaning
+0 | Success, initialization or successful preview
+1 | A child command or C++ compilation failed
+2 | Invalid configuration/plan or execution-environment error
+130 | Keyboard interruption during execution
+
+Assumptions and limitations
+
+This runner does not introspect --help for arbitrary CLI schemas, forward its own configuration flags automatically, or infer science. All CLI values beneath intent belong to the child. Commands receive argument arrays without shell evaluation. Multiple preview flags are accepted with --print-config taking priority. --init takes priority over run options.
+
+Troubleshooting
+
+Symptom | Action
+Intent not found | Check intent_paths, extension, explicit path or PATH fallback.
+Ambiguous intent | Specify the extension or remove conflicting files from that search directory.
+Unexpected/missing end | Close variables, defaults and intent blocks individually.
+Executable not found | Provide an existing Python interpreter or compiler path/name.
+Child rejects a flag | Check that CLI help; use args for its exact dialect, including --no-flag.
+C++ compilation fails | Inspect compiler output; use a compiled executable for multi-source projects.
+No selected intents | Check use: false, --only and cairn selectors.
+Sample initialization refuses overwrite | Choose another directory or edit existing workspace files.
+
+Current CLI help
+
+usage: pipeline-plan-run [-h] [--plan PLAN_OPT] [--version]
+                         [--setup-file SETUP_FILE]
+                         [--parameter-file PARAMETER_FILE]
+                         [--init [DIRECTORY]] [--print-config] [--dry-run]
+                         [--list] [--intent-path INTENT_PATH]
+                         [--workdir WORKDIR] [--output-path OUTPUT_PATH]
+                         [--plot-path PLOT_PATH]
+                         [--python-executable PYTHON_EXECUTABLE] [--cxx CXX]
+                         [--allow-path | --no-allow-path]
+                         [--continue-on-error | --no-continue-on-error]
+                         [-c CAIRN] [--only ONLY]
+                         [plan]
+
+Run generic CLI intents from GMRTCAL-style plan blocks (standard library
+only).
+
+positional arguments:
+  plan                  Plan path, relative to the caller
+
+options:
+  -h, --help            show this help message and exit
+  --plan, --pipeline PLAN_OPT
+  --version             show program's version number and exit
+  --setup-file SETUP_FILE
+                        Setup JSON; paths resolve against this file
+  --parameter-file PARAMETER_FILE
+                        Replace setup-selected parameter JSON
+  --init [DIRECTORY]    Create sample plan/setup/parameters/intent; refuse
+                        overwrites
+  --print-config        Print resolved configuration and selected steps
+                        without executing
+  --dry-run             Validate and preview without executing or compiling
+  --list                List selected intents without executing
+  --intent-path INTENT_PATH
+                        Intent file/directory; repeat to replace setup search
+                        paths
+  --workdir WORKDIR     Existing child working directory
+  --output-path OUTPUT_PATH
+                        Directory for unique run reports and C++ builds
+  --plot-path PLOT_PATH
+                        Value of the plan's ${plot_path} variable
+  --python-executable PYTHON_EXECUTABLE
+                        Python interpreter for .py intents
+  --cxx CXX             Compiler for single C++ translation units (default:
+                        c++)
+  --allow-path, --no-allow-path
+                        Allow fallback to commands on PATH (default: yes)
+  --continue-on-error, --no-continue-on-error
+                        Continue after failures; final exit remains nonzero
+  -c, --cairn, --steps CAIRN
+                        Select N, N-M, -M, N-, or comma-separated ranges;
+                        repeatable
+  --only ONLY           Select an intent, label, or cairn number
+
+No arguments creates a sample workspace in the current directory. Child
+commands receive argument arrays, never shell evaluation.

@@ -1,24 +1,12 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Plan syntax · astro-pipeline</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#content">Skip to content</a><header><p class="eyebrow">ASTRO-PIPELINE / USER GUIDE</p><h1>Plan syntax</h1><p class="subtitle">Each intent block names a CLI and supplies its inputs.</p><p class="version">Version 0.1.1 · Generated 2026-09-21</p></header><nav aria-label="Documentation Tree"><a href="index.html">Documentation home</a><a href="README.html">Overview</a><a href="astro-pipeline-step-by-step.html">Step-by-step</a><a href="pipeline-plan-run.html">Command reference</a><a href="astro-pipeline-configuration.html">Configuration</a><a href="astro-pipeline-plan-syntax.html" aria-current="page">Plan syntax</a><a href="astro-pipeline-product-report.html">Run reports</a></nav><main id="content"><h2>Minimal intent</h2><pre><code>intent: echo-message.py
-  message: &quot;Hello world&quot;
-  count: 2
-end</code></pre><p>This invokes the resolved Python script with --message &quot;Hello world&quot; --count 2. Indentation is decorative. key: value and key = value are accepted. Comments start at # outside quotes. Values use JSON scalars/arrays/objects where valid; otherwise text is literal. Use lowercase true, false and null to obtain typed values. Both double-quoted and single-quoted strings are supported.</p><h2>CLI value translation</h2><div class="table-wrap"><table><thead><tr><th scope="col">Input</th><th scope="col">Generated tokens</th></tr></thead><tbody><tr><td>input_file: data.fits</td><td>--input-file data.fits</td></tr><tr><td>-x: 2</td><td>-x 2</td></tr><tr><td>--long_option: text</td><td>--long_option text (spelling preserved)</td></tr><tr><td>verbose: true</td><td>--verbose</td></tr><tr><td>enabled: false</td><td>--enabled=false</td></tr><tr><td>unused: null</td><td>No tokens</td></tr><tr><td>count: 0</td><td>--count 0</td></tr><tr><td>text: &quot;&quot;</td><td>--text followed by an empty argument</td></tr><tr><td>values: [1, 2]</td><td>--values 1 2</td></tr><tr><td>values: []</td><td>--values</td></tr><tr><td>args: [&quot;convert&quot;, &quot;--&quot;, &quot;a b&quot;]</td><td>Exact tokens appended after generated options</td></tr><tr><td>options: {&quot;label&quot;: &quot;value&quot;}</td><td>--label value (escape for reserved names)</td></tr></tbody></table></div><p>Boolean dialects vary by CLI. Use args: [&quot;--no-enabled&quot;] if the child expects a negative flag. Put the full token sequence in args for subcommands that must come before options. Piping, redirection, wildcards, environment expansion and command substitution are not interpreted. Use an explicit shell script if shell behavior is needed. Option names are letters/digits/underscores/hyphens; arguments may contain spaces.</p><h2>Reserved metadata</h2><div class="table-wrap"><table><thead><tr><th scope="col">Key</th><th scope="col">Type / default</th><th scope="col">Behavior</th></tr></thead><tbody><tr><td>label</td><td>String / intent name</td><td>Display and exact --only selection label.</td></tr><tr><td>use</td><td>Boolean / true</td><td>False skips execution (variables and metadata still parse).</td></tr><tr><td>iter</td><td>Positive integer / 1</td><td>Repeat this intent; iteration field counts 1..iter.</td></tr><tr><td>args</td><td>Array of strings / []</td><td>Exact tokens appended after generated options.</td></tr><tr><td>options</td><td>Object / {}</td><td>Explicit CLI values; override same-named inputs and permit reserved names.</td></tr></tbody></table></div><h2>Variables and defaults</h2><pre><code>variables:
-  greeting: &quot;Hello&quot;
-end
-defaults:
-  count: 1
-end
-intent: echo-message
-  message: ${greeting}
-  count: 2
-end</code></pre><p>Variable names use letters, digits and underscores, starting with a letter or underscore. A whole-value ${name} preserves the referenced JSON type; interpolation inside longer text produces a string. Missing names and recursive references are errors. Variables/defaults are captured when each intent begins. Defaults must be understood by every affected CLI. The runner does not discover option schemas.</p><h2>Cairns and fixed loops</h2><pre><code>loop: 2
-cairn: 4
-intent: echo-message
-  message: &quot;Repeated group&quot;
-  iter: 2
-end
-cairn: 7
-intent: echo-message
-  message: &quot;Second step&quot;
-end
-loop: end</code></pre><p>This executes cairn 4 twice, cairn 7 once, and then repeats that group. Nested loops are rejected. Cairn labels remain the same across loop repetitions; report order distinguishes executions. There is no loop-pass field or automatic iteration-dependent option scaling. Without an explicit cairn, the intent ordinal is used, including disabled intents. Large repeat counts expand into an in-memory execution list.</p><h2>Selection and block boundaries</h2><p>Use -c for positive cairn numbers/ranges, and --only for an exact label, intent name or number. Together they intersect. Every variables/defaults/intent block requires end (also end:, end card or ---). A fixed loop requires loop: end after its complete intent blocks. Raw shell command lines and GMRTCAL-specific science/stop-criteria cards are unsupported.</p></main><footer><a href="astro-pipeline-plan-syntax.txt">Plain-text version</a> · <a href="astro-pipeline-step-by-step.html">Step-by-step guide</a> · <a href="astro-pipeline-product-report.html">Product formats</a><p>Offline documentation · Version 0.1.1 · Generated 2026-09-21</p></footer></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><title>Plan Syntax | astro-pipeline</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Plan Syntax</h1>
+    <nav><ul><li><a href="index.html">Home</a></li></ul></nav>
+    <main><p>Syntax details go here.</p></main>
+</body>
+</html>

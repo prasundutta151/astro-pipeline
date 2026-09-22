@@ -1,0 +1,79 @@
+Step-by-step guide
+Version 0.1.1 · Generated 2026-09-21
+Create, inspect, execute, and review a pipeline.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Step | Goal | Command
+1 | Install from the checkout | python3 script/install
+2 | Create sample workspace | pipeline-plan-run --init ./my-pipeline
+3 | Inspect effective inputs | pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json --print-config
+4 | Preview commands | pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json --dry-run
+5 | Execute | pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json
+6 | Read results | Open output/run-*/report.json under my-pipeline
+
+1. Install
+
+Use the Overview installation commands. Expected --version output for this release is 0.1.1. If the command is not found, add the chosen prefix/bin to PATH or invoke its absolute path. Select the Python environment with your needed dependencies before running the installer, or specify python_executable in setup.
+
+2. Initialize and configure
+
+Run --init with a new directory. Expected output starts with Created sample workspace and includes preview/run commands. Edit intent_paths in pipeline-setup.json to list your CLI directories or files in search order. Set workdir to an existing directory. The generated JSON paths are relative to that JSON file, so the workspace can be used from another working directory.
+
+3. Inspect the plan
+
+# Generic CLI pipeline. No GMRTCAL commands or dependencies.
+# Created by pipeline-plan-run --init DIRECTORY (or a first run without arguments).
+variables:
+  greeting: "Hello from astro-pipeline"
+end
+
+# Defaults become options on every intent; use only options they all accept.
+defaults:
+  count: 1
+end
+
+cairn: 1
+intent: echo-message
+  label: "First CLI intent"
+  message: ${greeting}
+  uppercase: true
+end
+
+cairn: 2
+intent: echo-message.py
+  message: "Options below intent become CLI inputs"
+  count: 2
+end
+
+# Add your own script or compiled binary to intent_paths in pipeline-setup.json.
+# intent: my-analysis
+#   input_file: "${plan_dir}/data/observation.fits"
+#   sigma: 3.0
+#   args: ["--", "positional input"]
+# end
+
+This is the actual bundled sample plan. Its first intent prints an uppercase greeting. Its second intent prints another message twice. For your own CLI, add option/value pairs below intent. Use args for positional inputs or exact option token sequences.
+
+4. Preview
+
+--print-config prints JSON containing absolute runner paths and selected argument lists. --dry-run or --list prints [Cairn N] lines. These modes create no run directory, compile nothing and execute no child. For C++ the preview shows the planned compiler command; it does not verify that compilation will succeed.
+
+5. Run or select a subset
+
+pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json
+pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json -c '[2-2]'
+pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json --only 'First CLI intent'
+
+Expected sample message output: HELLO FROM ASTRO-PIPELINE, followed by Options below intent become CLI inputs twice. These messages are tested by the sample integration workflow; run-directory names and elapsed times vary.
+
+6. Verify and recover
+
+Find the printed Run report path and check status: completed plus returncode: 0 for all recorded steps. A failed report identifies the command or compiler exit code. Correct the CLI arguments, input paths or compiler error, preview again, then select the relevant cairns if rerunning a subset is scientifically appropriate. There is no automatic resume state; earlier side effects are not rolled back.

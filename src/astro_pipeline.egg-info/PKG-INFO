@@ -1,0 +1,160 @@
+Metadata-Version: 2.4
+Name: astro-pipeline
+Version: 0.1.0
+Summary: Generic CLI pipeline runner for astronomical data processing.
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: astropy
+
+# astro-pipeline
+
+`pipeline-plan-run` runs generic command-line programs in the order specified by
+a GMRTCAL-style `.plan` file. It has no GMRTCAL, CASA, or astronomy-library
+dependency. Python 3.9+ and its standard library are sufficient; compiling C++
+intents additionally requires a C++ compiler.
+
+Current release: **0.1.1**. The [offline documentation](docs/index.html) includes
+the [step-by-step guide](docs/astro-pipeline-step-by-step.html),
+[command reference](docs/pipeline-plan-run.html), and matching plain-text files.
+For browsing on GitHub, start with [the plain-text overview](docs/README.txt).
+
+## Install and first run
+
+From this checkout, run `python3 script/install`. The installer records that
+Python interpreter and this checkout's absolute location in a launcher at
+`~/.local/bin/pipeline-plan-run`. Add `~/.local/bin` to your PATH if necessary.
+Use `--prefix DIRECTORY` for another prefix. Reinstall after moving the checkout;
+uninstall with `python3 script/install --uninstall` (same prefix if customized).
+Unrelated existing commands are never replaced.
+
+```sh
+pipeline-plan-run --init ./my-pipeline
+pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json --dry-run
+pipeline-plan-run --setup-file ./my-pipeline/pipeline-setup.json
+```
+
+Running `pipeline-plan-run` with no arguments creates the same sample workspace
+in the current directory and exits. Initialization refuses to overwrite existing
+sample files. It creates `pipeline.plan`, `pipeline-setup.json`,
+`pipeline-parameters.json`, and a runnable `intents/echo-message.py` CLI example.
+Templates in `json/` describe this generated workspace; initialize before using
+them. The earlier `pipeline/pipeline.example.json` remains a non-runnable scaffold
+illustration; the implemented runner reads `.plan` text.
+
+## Generic intents
+
+```text
+variables:
+  source: "${plan_dir}/observations/input.fits"
+end
+
+cairn: 1
+intent: my-analysis.py
+  input_file: ${source}
+  sigma: 3.0
+  verbose: true
+end
+
+cairn: 2
+intent: my-native-program
+  args: ["convert", "--format", "fits", "input with spaces"]
+end
+```
+
+The setup JSON's `intent_paths` is an ordered list of directories or individual
+files. Relative paths resolve against the setup JSON. Each directory is searched
+nonrecursively: exact filename first, then `.py`, `.cpp`, `.cc`, `.cxx`, `.C` for a
+bare intent name. Ambiguous extensions are errors; the first matching search
+entry wins. With `allow_path: true` (default), unmatched names are searched on PATH.
+`--no-allow-path` disables that fallback. An intent containing `/` resolves
+relative to the plan file. Python files run with `python_executable` (default:
+the runner's interpreter); other files must be executable. Single C++ translation
+units compile with `cxx` (default `c++`) and `cxx_flags` (default
+`["-std=c++17", "-O2"]`). For projects needing several sources or a build system,
+build separately and use the resulting executable as the intent.
+
+Each entry under an intent is a CLI option: `input_file: value` becomes
+`--input-file value`; explicit `-x` and `--long_option` preserve their spelling.
+Numbers and strings become values, `true` emits a bare flag, `false` emits
+`--option=false`, `null` omits an option, and lists emit a flag followed by their
+items. Zero, empty strings, and empty lists are preserved. CLI boolean conventions
+differ: for programs using `--no-option` or other conventions, supply exact tokens
+through `args`. `args` is a JSON array of strings appended after generated options;
+it supports subcommands, positional arguments, repeated options, and `--`.
+Commands use argument arrays; shell pipes, redirection, glob expansion, environment
+expansion and command substitution are not evaluated. To invoke shell logic, name
+an explicit script as the intent.
+
+Reserved intent entries are `label` (display/selection name), `use` (boolean;
+false skips the intent), `iter` (positive repetition count), `args`, and `options`.
+Use `options: {"label": "value"}` to pass a reserved name to the underlying CLI.
+`defaults:` blocks supply common CLI inputs; intent entries override them. Only
+include defaults understood by all affected CLIs; the runner does not execute
+children's `--help` to guess their options. `${name}` expands variables with cycle
+detection; a whole-value reference retains its JSON type. Built-in path variables
+are `${plan_dir}`, `${workdir}`, `${output_path}`, and `${plot_path}`. Arbitrary
+child CLI values are passed unchanged; use these absolute path variables for
+portable file inputs. Relative child CLI paths are interpreted by that program
+from `workdir`, which must already exist.
+
+Every variables/defaults/intent block ends with `end`. `#` comments are supported
+outside quoted strings. `cairn: N` assigns a positive step number; otherwise the
+intent's ordinal is used. `loop: N` before a group of complete intent blocks and
+`loop: end` afterwards repeat that group N times; nested loops are rejected.
+Unknown syntax is an error. This is a generic subset of GMRTCAL's plan syntax;
+scientific convergence criteria, calibration aliases, snapshots, and resource
+estimation are not provided.
+
+## Configuration and execution
+
+Setup JSON requires `schema_version: 1`; `input_file` (or `plan_file`) identifies
+the plan. It also accepts `workdir`, `output_path`, `plot_path`, `parameter_file`,
+`intent_paths`, `allow_path`, `python_executable`, `cxx`, and `cxx_flags`. Paths
+expand `~`, but not environment variables. CLI path overrides resolve against
+the caller's directory; setup paths resolve against the setup file's directory.
+A setup file is optional when the CLI supplies the plan and any intent paths.
+
+Parameter JSON has `schema_version: 1` and `parameters`, with `variables`,
+`defaults`, and `continue_on_error`. `--parameter-file` replaces the setup-selected
+parameter file entirely. Parameter variables/defaults establish the initial plan
+values; subsequent plan blocks and individual intent inputs specialize them.
+Explicit CLI runner flags override parameter/setup settings; omitted flags do not
+overwrite JSON settings. There are no built-in scientific parameters, units,
+calibration choices or random seeds: these belong to the individual intent CLIs.
+
+Useful options (see `--help` for all):
+
+- `--print-config`: resolved configuration and selected intent argument arrays.
+- `--dry-run` / `--list`: preview selected commands without running or compiling.
+- `-c '[2-5]'`, `-c '1,3,7-'`, `--only LABEL`: select steps.
+- `--intent-path PATH` (repeatable): replace all setup search paths.
+- `--continue-on-error`: run remaining intents after failure; exit remains nonzero.
+- `--no-continue-on-error`: explicitly override a true JSON setting.
+
+All selected intents are resolved and validated before any executes. Execution
+streams child output live and stops at the first failed command or C++ build by
+default. Exit codes are 0 for success, 1 for child/build failure, 2 for configuration
+or execution-environment errors, and 130 for keyboard interruption. The runner
+does not validate each CLI's scientific option schema: that CLI must validate it.
+
+Each actual run creates a unique `run-*` directory under `output_path`, containing
+compiled binaries if needed and an atomically updated `report.json`. Reports
+record version, effective configuration, source/plan SHA-256 hashes, argument
+arrays, child exit codes and durations in seconds. Source hashes do not capture
+external dependencies or input data contents. Existing reports are preserved.
+`plot_path` is a variable for intents, not a directory created by the runner.
+Child outputs/overwrite behavior are controlled by their own explicit CLI options;
+the runner never injects an overwrite flag. Reports include local paths and CLI
+values, so avoid passing credentials as arguments.
+
+## Development
+
+Run `python3 -m unittest discover -s tests -v`. Tests use temporary directories and
+synthetic CLIs, including actual C++ compilation when a compiler is available.
+No separate Python build step is needed. Read `AGENTS.md` and `startup-prompt.txt`
+for agent work; see `docs/GIT_SETUP.txt` and `docs/CONTEXT_WORKFLOW.md` for handoffs.
+User manuals are generated only on an explicit documentation request. Version
+0.1.1 manuals were generated directly with user authorization because
+project-document was unavailable. Their shared source is
+`script/generate-docs.py`; regenerate with `python3 script/generate-docs.py`.
