@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""Install a launcher with this Python interpreter, without changing shell files."""
+import argparse
+from pathlib import Path
+import shlex
+import sys
+
+root = Path(__file__).resolve().parent.parent
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--prefix", type=Path, default=Path.home() / ".local")
+parser.add_argument("--uninstall", action="store_true")
+args = parser.parse_args()
+target = args.prefix.expanduser().resolve() / "bin/pipeline-plan-run"
+marker = "# astro-pipeline managed launcher\n"
+content = "#!/bin/sh\n" + marker + "exec " + shlex.quote(sys.executable) + " " + shlex.quote(str(root / "script/pipeline-plan-run")) + ' "$@"\n'
+if target.is_symlink() or (target.exists() and (not target.is_file() or marker not in target.read_text())):
+    parser.error(f"Refusing to replace unrelated command: {target}")
+if args.uninstall:
+    if target.exists():
+        target.unlink()
+    print(f"Uninstalled {target}")
+else:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    target.chmod(0o755)
+    print(f"Installed {target}\nAdd {target.parent} to PATH if necessary.")

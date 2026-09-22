@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "input_file": "pipeline.plan",
+  "workdir": ".",
+  "output_path": "output",
+  "plot_path": "plot/generated",
+  "parameter_file": "pipeline-parameters.json",
+  "intent_paths": ["intents"],
+  "allow_path": true,
+  "cxx": "c++",
+  "cxx_flags": ["-std=c++17", "-O2"]
+}

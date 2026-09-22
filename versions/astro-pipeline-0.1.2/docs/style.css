@@ -1,0 +1,27 @@
+:root { color-scheme: light; font-family: system-ui, -apple-system, sans-serif; color: #172b3a; background: #f3f6f8; line-height: 1.65; }
+* { box-sizing: border-box; }
+body { max-width: 1040px; margin: auto; padding: 32px 28px; }
+header { padding: 32px; border-radius: 14px 14px 0 0; background: #123c4a; color: #fff; }
+h1 { font-size: clamp(1.8rem, 5vw, 2.65rem); line-height: 1.15; margin: 12px 0; }
+.eyebrow { font-size: .75rem; letter-spacing: .15em; color: #bce7da; font-weight: 700; margin: 0; }
+.subtitle { font-size: 1.1rem; max-width: 760px; color: #e5f0f3; }
+.version { font-size: .85rem; color: #cbdfe5; margin-bottom: 0; }
+nav { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 16px 24px; background: #e4edf0; border-bottom: 1px solid #c4d5dd; }
+a { color: #075c74; text-underline-offset: 3px; }
+nav a { font-size: .87rem; }
+nav a[aria-current] { font-weight: 750; color: #112f3a; }
+main { padding: 16px 32px 32px; background: white; }
+h2 { font-size: 1.3rem; border-bottom: 1px solid #dbe6eb; padding-bottom: 8px; margin-top: 32px; }
+p { max-width: 86ch; }
+pre { background: #152c38; color: #e7f2f4; padding: 18px 20px; border-radius: 7px; overflow-x: auto; font-size: .85rem; line-height: 1.6; }
+code { font-family: ui-monospace, monospace; }
+.table-wrap { overflow-x: auto; margin: 22px 0; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; text-align: left; }
+th { background: #eaf1f4; font-weight: 700; }
+th, td { padding: 12px; border: 1px solid #d7e1e7; vertical-align: top; overflow-wrap: anywhere; min-width: 110px; }
+tr:nth-child(even) { background: #f8fafb; }
+footer { font-size: .83rem; padding: 24px 4px; color: #536875; }
+.skip { position: absolute; left: -10000px; }
+.skip:focus { position: static; }
+@media (max-width: 600px) { body { padding: 12px; } header { padding: 24px 20px; } main { padding: 8px 18px 24px; } nav { padding: 14px 18px; } pre { padding: 14px; } }
+@media print { body { max-width: none; padding: 0; background: white; } nav, .skip { display: none; } pre { white-space: pre-wrap; color: black; background: #eee; } }

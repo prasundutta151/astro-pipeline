@@ -1,0 +1,27 @@
+2026-09-21: Documentation workflow exception for release 0.1.1
+
+project-document was not found on PATH or under the user's home directory.
+The user explicitly authorized: "Generate documentation directly for this release".
+Use script/generate-docs.py as the shared HTML/TXT source for this release.
+The normal project-document policy remains in effect for future requests unless
+the user overrides it again. No scientific plots are generated: this runner has
+no scientific plotting product.
+
+2026-09-20: First generic pipeline runner
+
+The user explicitly requested the executable name pipeline-plan-run; this overrides
+the default astro-pipeline-* command prefix while retaining a pipeline-specific name.
+Read GMRTCAL's local gmrtcal-plan-run implementation and sample plan as behavioral
+references. Implement a standalone generic subset without copying its science
+dependencies, calibration aliases or convergence heuristics.
+
+The user clarified that any CLI program can be an intent, with CLI inputs under
+the intent block, and requested first-run sample creation. No scientific algorithms
+are implemented; external programs own their option/science validation. Python
+scripts and single-source C++ compilation are conveniences; other languages work
+through executables or interpreter CLIs with args. Multi-source builds remain the
+external program's responsibility. Initialization never overwrites existing files.
+
+No full HTML/TXT user manuals were generated. Pending project-document scope:
+runner command reference, plan syntax, setup/parameter configuration, first-run
+workflow, search precedence, CLI value mapping, C++ builds and report format.

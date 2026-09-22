@@ -1,0 +1,62 @@
+Run reports
+Version 0.1.1 · Generated 2026-09-21
+Execution provenance and optional compiled binaries.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Location and file conventions
+
+An actual run creates output_path/run-YYYYMMDDTHHMMSSZ-<unique-suffix>/report.json. The timestamp prefix is UTC. C++ builds use intent-N filenames in that directory, where N starts at 0. report.json is UTF-8 JSON, rewritten atomically through report.tmp after each completed step and at finalization. No report or directory is created by previews. Existing runs are not overwritten.
+
+Top-level JSON fields
+
+Field | Type / units | Meaning
+version | String | Current software version (first line of version/VERSION).
+started_utc / finished_utc | ISO 8601 strings, UTC | Start/finalization timestamps; finished_utc absent while running.
+config | Object | Resolved setup/parameter paths, runner settings, variables/defaults. setup_file and parameter_file may be null.
+plan_sha256 | 64-character hexadecimal string | Hash of plan file bytes at execution start.
+status | String | running, completed, failed or interrupted.
+steps | Array of objects | Attempted steps in actual execution order; not unexecuted future steps.
+error | Optional string | Execution-environment error text if an OSError occurs.
+
+Step objects
+
+Field | Type / units | Meaning
+cairn | Positive integer | Plan step number, preserved across repeats.
+label / intent / path | Strings | Display label, intent name and resolved source/executable path.
+kind | String | python, cpp or executable.
+args | Array of strings | Translated child CLI arguments.
+iteration | Positive integer | Within-intent repetition number; resets across fixed-loop passes.
+source_sha256 | 64-character hexadecimal string | Hash of the source/executable bytes.
+compile_argv | Optional string array | Compiler command when compilation was attempted for this step.
+argv | Optional string array | Executed child command; absent if compilation failed.
+returncode | Integer | Child/compiler code; 0 means success, negative values can represent signals on POSIX.
+elapsed_seconds | Number, seconds | Wall time from monotonic clock, including compilation when performed.
+
+Missing fields and limitations
+
+Interrupted steps or execution-environment errors may leave the last step without returncode or elapsed_seconds. A forced kill may leave status running and no finished_utc. A report does not guarantee that child outputs are complete. Streams are inherited, not copied into report files. Hashes identify local bytes, not dependencies, linked libraries, environment packages or observation data. There are no scientific arrays, coordinate frames, dtype/shape conventions or missing-value sentinels in this format.
+
+Read a report
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+reports = list(Path("my-pipeline/output").glob("run-*/report.json"))
+latest = max(reports, key=lambda path: path.stat().st_mtime)
+report = json.loads(latest.read_text())
+print(report["version"], report["status"])
+for step in report["steps"]:
+    print(step["cairn"], step["label"], step.get("returncode", "unfinished"))
+PY
+
+Other outputs
+
+The initialization product consists of editable plan/setup/parameter files and the sample intent, described in the step-by-step guide. --print-config writes effective configuration and selected steps as JSON to stdout; it is not a run report. Child-generated products are outside the runner schema. No automatic stage copying, scientific plots or release archives are produced by a pipeline run.

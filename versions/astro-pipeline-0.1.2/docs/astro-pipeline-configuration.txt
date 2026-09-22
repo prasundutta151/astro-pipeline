@@ -1,0 +1,76 @@
+Configuration
+Version 0.1.1 · Generated 2026-09-21
+Two JSON files separate runner paths from reusable plan inputs.
+
+Documentation Tree
+Documentation home: index.txt
+Overview: README.txt
+Step-by-step: astro-pipeline-step-by-step.txt
+Command reference: pipeline-plan-run.txt
+Configuration: astro-pipeline-configuration.txt
+Plan syntax: astro-pipeline-plan-syntax.txt
+Run reports: astro-pipeline-product-report.txt
+
+Setup JSON
+
+{
+  "schema_version": 1,
+  "input_file": "pipeline.plan",
+  "workdir": ".",
+  "output_path": "output",
+  "plot_path": "plot/generated",
+  "parameter_file": "pipeline-parameters.json",
+  "intent_paths": ["intents"],
+  "allow_path": true,
+  "cxx": "c++",
+  "cxx_flags": ["-std=c++17", "-O2"]
+}
+
+This is the actual first-run template; its paths refer to the generated workspace, not the source json/ directory. All setup keys are listed below. Unknown/duplicate keys, unsupported schema versions and invalid types are rejected.
+
+Key | Type | Default / requirement | Meaning
+schema_version | Integer | Required: 1 | Only version 1 accepted.
+input_file / plan_file | File path | None | Existing plan; CLI plan may supply/override it. Do not set both.
+workdir | Directory path | . | Must exist; base for child relative CLI paths.
+output_path | Directory path | output | Created during execution, not preview.
+plot_path | Directory path | plot/generated | Plan variable; creation belongs to intent.
+parameter_file | File path | None | Optional parameters JSON; relative to setup JSON.
+intent_paths | Array of paths | [] | Ordered existing directories or files.
+allow_path | Boolean | true | Fallback search on inherited PATH.
+python_executable | Executable path/name | Runner interpreter | Must exist and be executable.
+cxx | Executable path/name | c++ | Required only when a selected C++ source intent needs compilation.
+cxx_flags | Array of strings | ["-std=c++17", "-O2"] | Passed as compiler arguments without shell evaluation. Relative compiler argument paths use workdir.
+
+Parameter JSON
+
+{
+  "schema_version": 1,
+  "parameters": {
+    "variables": {},
+    "defaults": {},
+    "continue_on_error": false
+  }
+}
+
+Field | Type | Default / requirement | Meaning
+schema_version | Integer | Required: 1 | Only supported schema version.
+parameters | Object | Required | Accepts variables, defaults, continue_on_error only.
+parameters.variables | Object | {} | Initial named plan variables.
+parameters.defaults | Object | {} | Initial common CLI inputs; must suit every affected intent.
+parameters.continue_on_error | Boolean | false | Runner failure policy, overridden by explicit CLI flags.
+
+Precedence
+
+Explicit CLI runner options override setup/parameter values, which override built-in defaults. --parameter-file selects a replacement parameter file, never a merge. --intent-path values replace the complete setup search list. Within plan processing, parameter variables/defaults initialize the state, later variables/defaults blocks update it, and per-intent inputs override defaults. Built-in path variables override same-named parameter variables initially; subsequent plan variable definitions can replace them.
+
+Path rules
+
+Setup paths resolve against the setup JSON parent. CLI paths resolve against the caller. Without a setup file, default paths use the caller. ~ expands for runner-managed paths; environment variables do not. Compiler/Python command names use PATH; path-valued settings use the same setup/CLI base rules. An explicit intent path resolves against the plan parent. Child CLI option values are opaque: the runner does not infer which strings are paths or rewrite path strings in parameter variables/defaults. Relative child CLI inputs and compiler flags use workdir; use ${plan_dir}, ${workdir}, ${output_path} or ${plot_path} for explicit absolute inputs.
+
+Intent discovery
+
+Search intent_paths in order. An individual file matches its filename or stem. A directory checks an exact filename first, then suffix candidates .py, .cpp, .cc, .cxx and .C. Multiple suffix matches within one directory are an error. The first matching entry wins. If unmatched and allow_path is true, search PATH. The search is not recursive. Python scripts need not have an executable bit; other non-C++ files must be executable.
+
+Portable environments
+
+Set python_executable to your environment interpreter when intents depend on packages unavailable to the runner interpreter. Single C++ source files compile once per source per run, with binaries stored beside the report. Supply prebuilt executables for larger builds or specialized build systems.
